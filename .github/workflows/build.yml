@@ -1,4 +1,4 @@
-name: Zotero Android Release Tracker
+name: Zotero Android Build Tracker
 
 on:
   schedule:
@@ -87,17 +87,16 @@ jobs:
         run: chmod +x gradlew
         working-directory: zotero-android
 
-      - name: Build Release APK
+      - name: Build APK
         run: |
-          echo "Building release APK..."
-          ./gradlew assembleRelease --warning-mode all
+          # Disable play publisher plugin in gradle.properties
+          echo "android.playPublisher.enabled=false" >> gradle.properties
           
-          echo "Looking for APK files:"
-          find . -name "*.apk"
+          ./gradlew assembleDevDebug --warning-mode all
           
-          # Copy APK to a known location with version in name
+          # Create artifacts directory and copy APK with version name
           mkdir -p artifacts
-          cp app/build/outputs/apk/release/app-release-unsigned.apk artifacts/zotero-android-${{ needs.check-release.outputs.release_tag }}.apk
+          cp app/build/outputs/apk/dev/debug/app-dev-debug.apk artifacts/zotero-android-${{ needs.check-release.outputs.release_tag }}.apk
         working-directory: zotero-android
 
       - name: Create Release
