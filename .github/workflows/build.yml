@@ -70,21 +70,24 @@ jobs:
           python-version: "3.10"
 
       - name: Create python scripts
-        run: |
-          echo "Creating bundle_translators.py"
-          cat > bundle_translators.py << 'EOL'
-import os
-print("Bundle translators script - placeholder")
-EOL
-          
-          echo "Creating bundle_translation.py"
-          cat > bundle_translation.py << 'EOL'
-import os
-print("Bundle translation script - placeholder")
-EOL
-          
-          chmod +x bundle_translators.py bundle_translation.py
         working-directory: zotero-android
+        run: |
+          # Create bundle_translators.py
+          echo '#!/usr/bin/env python3
+          import os
+          print("Bundle translators script - placeholder")' > bundle_translators.py
+          
+          # Create bundle_translation.py
+          echo '#!/usr/bin/env python3
+          import os
+          print("Bundle translation script - placeholder")' > bundle_translation.py
+          
+          # Make scripts executable
+          chmod +x bundle_translators.py bundle_translation.py
+          
+          # Debug output
+          echo "Created scripts:"
+          ls -la bundle_*.py
 
       - name: Execute bundling scripts
         run: |
