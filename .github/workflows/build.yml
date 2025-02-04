@@ -13,22 +13,23 @@ jobs:
       new_release: ${{ steps.check_release.outputs.new_release }}
       release_tag: ${{ steps.check_release.outputs.release_tag }}
     steps:
-      - name: Get latest Zotero release
+      - name: Get latest Zotero tag
         id: check_release
         run: |
-          # Get the latest release from Zotero's repo
-          LATEST_RELEASE=$(curl -s https://api.github.com/repos/zotero/zotero-android/releases/latest)
-          LATEST_TAG=$(echo $LATEST_RELEASE | jq -r .tag_name)
-          echo "Latest Zotero release: $LATEST_TAG"
+          # Get the latest tag from Zotero's repo (sorted by version number)
+          LATEST_TAG=$(curl -s https://api.github.com/repos/zotero/zotero-android/tags | jq -r '.[0].name')
+          echo "Latest Zotero tag: $LATEST_TAG"
           
-          # Get our last built release
-          LAST_BUILT=$(curl -s https://api.github.com/repos/${{ github.repository }}/releases/latest | jq -r .tag_name || echo "none")
-          echo "Our last built release: $LAST_BUILT"
+          # Get our last built tag, default to 'none' if no tags exist
+          LAST_BUILT=$(curl -s https://api.github.com/repos/${{ github.repository }}/tags | jq -r '.[0].name // "none"')
+          echo "Our last built tag: $LAST_BUILT"
           
-          if [ "$LAST_BUILT" != "$LATEST_TAG" ]; then
+          if [ "$LAST_BUILT" = "none" ] || [ "$LAST_BUILT" != "$LATEST_TAG" ]; then
+            echo "New release detected"
             echo "new_release=true" >> $GITHUB_OUTPUT
             echo "release_tag=$LATEST_TAG" >> $GITHUB_OUTPUT
           else
+            echo "No new release"
             echo "new_release=false" >> $GITHUB_OUTPUT
           fi
 
@@ -82,7 +83,7 @@ jobs:
           name: Zotero Android ${{ needs.check-release.outputs.release_tag }}
           makeLatest: true
           body: |
-            Built from Zotero Android release ${{ needs.check-release.outputs.release_tag }}
-            Source: https://github.com/zotero/zotero-android/releases/tag/${{ needs.check-release.outputs.release_tag }}
+            Built from Zotero Android tag ${{ needs.check-release.outputs.release_tag }}
+            Source: https://github.com/zotero/zotero-android/tree/${{ needs.check-release.outputs.release_tag }}
           artifacts: "app/build/outputs/apk/debug/*.apk"
           token: ${{ secrets.GITHUB_TOKEN }}
