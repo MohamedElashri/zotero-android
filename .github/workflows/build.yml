@@ -1,0 +1,88 @@
+name: Zotero Android Release Tracker
+
+on:
+  schedule:
+    - cron: "0 0 * * 0"  # Run weekly on Sunday at midnight
+  workflow_dispatch:  # Allow manual triggers
+
+jobs:
+  check-release:
+    name: Check for new Zotero Android release
+    runs-on: ubuntu-latest
+    outputs:
+      new_release: ${{ steps.check_release.outputs.new_release }}
+      release_tag: ${{ steps.check_release.outputs.release_tag }}
+    steps:
+      - name: Get latest Zotero release
+        id: check_release
+        run: |
+          # Get the latest release from Zotero's repo
+          LATEST_RELEASE=$(curl -s https://api.github.com/repos/zotero/zotero-android/releases/latest)
+          LATEST_TAG=$(echo $LATEST_RELEASE | jq -r .tag_name)
+          echo "Latest Zotero release: $LATEST_TAG"
+          
+          # Get our last built release
+          LAST_BUILT=$(curl -s https://api.github.com/repos/${{ github.repository }}/releases/latest | jq -r .tag_name || echo "none")
+          echo "Our last built release: $LAST_BUILT"
+          
+          if [ "$LAST_BUILT" != "$LATEST_TAG" ]; then
+            echo "new_release=true" >> $GITHUB_OUTPUT
+            echo "release_tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+          else
+            echo "new_release=false" >> $GITHUB_OUTPUT
+          fi
+
+  build:
+    needs: check-release
+    if: ${{ needs.check-release.outputs.new_release == 'true' }}
+    name: Build New Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          repository: "zotero/zotero-android"
+          ref: ${{ needs.check-release.outputs.release_tag }}
+
+      - name: set up JDK
+        uses: actions/setup-java@v3
+        with:
+          java-version: "17"
+          distribution: "zulu"
+          cache: gradle
+
+      - name: set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Grant execute permission for Python scripts
+        run: |
+          chmod +x scripts/bundle_translators.py
+          chmod +x scripts/bundle_translation.py
+
+      - name: Execute bundling scripts
+        run: |
+          python3 scripts/bundle_translators.py
+          python3 scripts/bundle_translation.py
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Download Android dependencies
+        run: ./gradlew androidDependencies --no-configuration-cache
+
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug
+
+      - name: Create Release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ needs.check-release.outputs.release_tag }}
+          name: Zotero Android ${{ needs.check-release.outputs.release_tag }}
+          makeLatest: true
+          body: |
+            Built from Zotero Android release ${{ needs.check-release.outputs.release_tag }}
+            Source: https://github.com/zotero/zotero-android/releases/tag/${{ needs.check-release.outputs.release_tag }}
+          artifacts: "app/build/outputs/apk/debug/*.apk"
+          token: ${{ secrets.GITHUB_TOKEN }}
