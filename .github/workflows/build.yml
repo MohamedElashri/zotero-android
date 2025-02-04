@@ -83,18 +83,21 @@ jobs:
           python3 bundle_translation.py
         working-directory: zotero-android
 
+      - name: Update Gradle Properties
+        run: |
+          echo "" >> gradle.properties
+          echo "android.nonTransitiveRClass=true" >> gradle.properties
+          echo "android.playPublisher.enabled=false" >> gradle.properties
+        working-directory: zotero-android
+
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
         working-directory: zotero-android
 
       - name: Build APK
         run: |
-          # Disable play publisher plugin in gradle.properties
-          echo "android.playPublisher.enabled=false" >> gradle.properties
-          
           ./gradlew assembleDevDebug --warning-mode all
           
-          # Create artifacts directory and copy APK with version name
           mkdir -p artifacts
           cp app/build/outputs/apk/dev/debug/app-dev-debug.apk artifacts/zotero-android-${{ needs.check-release.outputs.release_tag }}.apk
         working-directory: zotero-android
