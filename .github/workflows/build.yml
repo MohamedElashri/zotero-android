@@ -5,7 +5,6 @@ on:
     - cron: "0 0 * * 0"  # Run weekly on Sunday at midnight
   workflow_dispatch:  # Allow manual triggers
 
-# Add top-level permissions
 permissions:
   contents: write
   packages: read
@@ -21,11 +20,9 @@ jobs:
       - name: Get latest Zotero tag
         id: check_release
         run: |
-          # Get the latest tag from Zotero's repo (sorted by version number)
           LATEST_TAG=$(curl -s https://api.github.com/repos/zotero/zotero-android/tags | jq -r '.[0].name')
           echo "Latest Zotero tag: $LATEST_TAG"
           
-          # Get our last built tag, default to 'none' if no tags exist
           LAST_BUILT=$(curl -s https://api.github.com/repos/${{ github.repository }}/tags | jq -r '.[0].name // "none"')
           echo "Our last built tag: $LAST_BUILT"
           
@@ -43,26 +40,16 @@ jobs:
     if: ${{ needs.check-release.outputs.new_release == 'true' }}
     name: Build New Release
     runs-on: ubuntu-latest
-    # Add job-level permissions as well
     permissions:
       contents: write
     steps:
-      - name: Create and Debug Working Directory
-        run: |
-          mkdir -p zotero-android
-          cd zotero-android
-          echo "Now in: $(pwd)"
+      - name: Create Working Directory
+        run: mkdir -p zotero-android
 
       - name: Clone Zotero Android repository
         run: |
-          echo "Before clone - Current directory: $(pwd)"
           git clone --recursive https://github.com/zotero/zotero-android.git .
-          echo "After clone - Current directory: $(pwd)"
-          echo "Repository contents:"
-          ls -la
           git checkout ${{ needs.check-release.outputs.release_tag }}
-          echo "After checkout - Directory contents:"
-          ls -la
         working-directory: zotero-android
 
       - name: set up JDK
@@ -80,17 +67,14 @@ jobs:
       - name: Create python scripts
         working-directory: zotero-android
         run: |
-          # Create bundle_translators.py
           echo '#!/usr/bin/env python3
           import os
           print("Bundle translators script - placeholder")' > bundle_translators.py
           
-          # Create bundle_translation.py
           echo '#!/usr/bin/env python3
           import os
           print("Bundle translation script - placeholder")' > bundle_translation.py
           
-          # Make scripts executable
           chmod +x bundle_translators.py bundle_translation.py
 
       - name: Execute bundling scripts
@@ -100,30 +84,20 @@ jobs:
         working-directory: zotero-android
 
       - name: Grant execute permission for gradlew
-        run: |
-          chmod +x gradlew
+        run: chmod +x gradlew
         working-directory: zotero-android
 
-      - name: Download Android dependencies
-        run: ./gradlew androidDependencies --no-configuration-cache
-        working-directory: zotero-android
-
-      - name: Build Debug APK
+      - name: Build Release APK
         run: |
-          echo "Building debug APK..."
-          ./gradlew assembleDebug --warning-mode all
-          
-          echo "Exploring build outputs..."
-          echo "Contents of app/build:"
-          ls -R app/build || echo "app/build not found"
+          echo "Building release APK..."
+          ./gradlew assembleRelease --warning-mode all
           
           echo "Looking for APK files:"
           find . -name "*.apk"
           
-          # Store APK path in output
-          APK_PATH=$(find . -name "*.apk" | head -n 1)
-          echo "Found APK at: $APK_PATH"
-          echo "apk_path=$APK_PATH" >> $GITHUB_ENV
+          # Copy APK to a known location with version in name
+          mkdir -p artifacts
+          cp app/build/outputs/apk/release/app-release-unsigned.apk artifacts/zotero-android-${{ needs.check-release.outputs.release_tag }}.apk
         working-directory: zotero-android
 
       - name: Create Release
@@ -135,5 +109,5 @@ jobs:
           body: |
             Built from Zotero Android tag ${{ needs.check-release.outputs.release_tag }}
             Source: https://github.com/zotero/zotero-android/tree/${{ needs.check-release.outputs.release_tag }}
-          artifacts: ${{ env.apk_path }}
+          artifacts: "zotero-android/artifacts/zotero-android-${{ needs.check-release.outputs.release_tag }}.apk"
           token: ${{ secrets.GITHUB_TOKEN }}
