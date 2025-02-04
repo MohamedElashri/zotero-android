@@ -39,11 +39,16 @@ jobs:
     name: Build New Release
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-          repository: "zotero/zotero-android"
-          ref: ${{ needs.check-release.outputs.release_tag }}
+      - name: Create working directory
+        run: |
+          mkdir -p zotero-android
+          cd zotero-android
+
+      - name: Clone Zotero Android repository
+        run: |
+          git clone --recursive https://github.com/zotero/zotero-android.git .
+          git checkout ${{ needs.check-release.outputs.release_tag }}
+        working-directory: zotero-android
 
       - name: set up JDK
         uses: actions/setup-java@v3
@@ -61,20 +66,25 @@ jobs:
         run: |
           chmod +x scripts/bundle_translators.py
           chmod +x scripts/bundle_translation.py
+        working-directory: zotero-android
 
       - name: Execute bundling scripts
         run: |
           python3 scripts/bundle_translators.py
           python3 scripts/bundle_translation.py
+        working-directory: zotero-android
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
+        working-directory: zotero-android
 
       - name: Download Android dependencies
         run: ./gradlew androidDependencies --no-configuration-cache
+        working-directory: zotero-android
 
       - name: Build Debug APK
         run: ./gradlew assembleDebug
+        working-directory: zotero-android
 
       - name: Create Release
         uses: ncipollo/release-action@v1
@@ -85,5 +95,5 @@ jobs:
           body: |
             Built from Zotero Android tag ${{ needs.check-release.outputs.release_tag }}
             Source: https://github.com/zotero/zotero-android/tree/${{ needs.check-release.outputs.release_tag }}
-          artifacts: "app/build/outputs/apk/debug/*.apk"
+          artifacts: "zotero-android/app/build/outputs/apk/debug/*.apk"
           token: ${{ secrets.GITHUB_TOKEN }}
