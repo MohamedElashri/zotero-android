@@ -20,7 +20,33 @@ jobs:
       - name: Get latest Zotero tag
         id: check_release
         run: |
-          LATEST_TAG=$(curl -s https://api.github.com/repos/zotero/zotero-android/tags | jq -r '.[0].name')
+          # Get all tags and parse them to find the most recent one
+          # This will look for the 1.0.0-XXX format tag with the highest number
+          ALL_TAGS=$(curl -s https://api.github.com/repos/zotero/zotero-android/tags | jq -r '.[].name')
+          
+          # Find the highest 1.0.0-XXX format tag
+          LATEST_TAG=""
+          HIGHEST_NUM=0
+          
+          while read -r TAG; do
+            # Check if the tag matches the 1.0.0-XXX pattern
+            if [[ $TAG =~ ^1\.0\.0-([0-9]+)$ ]]; then
+              NUM=${BASH_REMATCH[1]}
+              if (( NUM > HIGHEST_NUM )); then
+                HIGHEST_NUM=$NUM
+                LATEST_TAG=$TAG
+              fi
+            fi
+          done <<< "$ALL_TAGS"
+          
+          # If we didn't find any matching tags, fall back to the first one
+          if [ -z "$LATEST_TAG" ]; then
+            LATEST_TAG=$(echo "$ALL_TAGS" | head -n 1)
+            echo "Warning: No tags matching 1.0.0-XXX format found, using first tag: $LATEST_TAG"
+          else
+            echo "Found highest 1.0.0-XXX tag: $LATEST_TAG (number: $HIGHEST_NUM)"
+          fi
+          
           echo "Latest Zotero tag: $LATEST_TAG"
           
           LAST_BUILT=$(curl -s https://api.github.com/repos/${{ github.repository }}/tags | jq -r '.[0].name // "none"')
