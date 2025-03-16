@@ -49,10 +49,18 @@ jobs:
           
           echo "Latest Zotero tag: $LATEST_TAG"
           
+          # Check if we have already built this release by looking at existing tags
           LAST_BUILT=$(curl -s https://api.github.com/repos/${{ github.repository }}/tags | jq -r '.[0].name // "none"')
           echo "Our last built tag: $LAST_BUILT"
           
-          if [ "$LAST_BUILT" = "none" ] || [ "$LAST_BUILT" != "$LATEST_TAG" ]; then
+          # Check if we already have a release for this tag
+          EXISTING_RELEASE=$(curl -s https://api.github.com/repos/${{ github.repository }}/releases/tags/$LATEST_TAG | jq -r '.tag_name // "none"')
+          echo "Existing release check: $EXISTING_RELEASE"
+          
+          if [ "$EXISTING_RELEASE" != "none" ]; then
+            echo "This tag has already been built and released. Skipping build."
+            echo "new_release=false" >> $GITHUB_OUTPUT
+          elif [ "$LAST_BUILT" = "none" ] || [ "$LAST_BUILT" != "$LATEST_TAG" ]; then
             echo "New release detected"
             echo "new_release=true" >> $GITHUB_OUTPUT
             echo "release_tag=$LATEST_TAG" >> $GITHUB_OUTPUT
